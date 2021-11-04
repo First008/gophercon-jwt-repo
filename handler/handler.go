@@ -2,17 +2,18 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gin-gonic/gin"
 	"jwt-app/auth"
 	"net/http"
 	"os"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
 )
 
 // ProfileHandler struct
 type profileHandler struct {
-	rd      auth.AuthInterface
-	tk      auth.TokenInterface
+	rd auth.AuthInterface
+	tk auth.TokenInterface
 }
 
 func NewProfile(rd auth.AuthInterface, tk auth.TokenInterface) *profileHandler {
@@ -24,17 +25,20 @@ type User struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
 //In memory user
-var user = User {
-	ID:           "1",
+var user = User{
+	ID:       "1",
 	Username: "username",
 	Password: "password",
 }
 
+var m map[string]User
+
 type Todo struct {
 	UserID string `json:"user_id"`
-	Title string `json:"title"`
-	Body string `json:"body"`
+	Title  string `json:"title"`
+	Body   string `json:"body"`
 }
 
 func (h *profileHandler) Login(c *gin.Context) {
@@ -44,16 +48,20 @@ func (h *profileHandler) Login(c *gin.Context) {
 		return
 	}
 	//compare the user from the request, with the one we defined:
-	if user.Username != u.Username || user.Password != u.Password {
+	// if user.Username != u.Username || user.Password != u.Password {
+	// 	c.JSON(http.StatusUnauthorized, "Please provide valid login details")
+	// 	return
+	if _, ok := m[u.ID]; !ok {
+		//do something here
 		c.JSON(http.StatusUnauthorized, "Please provide valid login details")
 		return
 	}
-	ts, err := h.tk.CreateToken(user.ID)
+	ts, err := h.tk.CreateToken(u.ID)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	saveErr := h.rd.CreateAuth(user.ID, ts)
+	saveErr := h.rd.CreateAuth(u.ID, ts)
 	if saveErr != nil {
 		c.JSON(http.StatusUnprocessableEntity, saveErr.Error())
 		return
@@ -68,6 +76,7 @@ func (h *profileHandler) Login(c *gin.Context) {
 func (h *profileHandler) Logout(c *gin.Context) {
 	//If metadata is passed and the tokens valid, delete them from the redis store
 	metadata, _ := h.tk.ExtractTokenMetadata(c.Request)
+
 	if metadata != nil {
 		deleteErr := h.rd.DeleteTokens(metadata)
 		if deleteErr != nil {
@@ -101,6 +110,52 @@ func (h *profileHandler) CreateTodo(c *gin.Context) {
 	c.JSON(http.StatusCreated, td)
 }
 
+func (h *profileHandler) ReturnIdentity(c *gin.Context) {
+	var id User
+
+	metadata, err := h.tk.ExtractTokenMetadata(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	userId, err := h.rd.FetchAuth(metadata.TokenUuid)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id.ID = userId
+	id.Username = m[userId].Username
+	id.Password = m[userId].Password
+
+	//you can proceed to save the  to a database
+
+	c.JSON(http.StatusOK, id)
+}
+
+func (h *profileHandler) CreateAccount(c *gin.Context) {
+	var u User
+	if err := c.ShouldBindJSON(&u); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, "Invalid json provided")
+		return
+	}
+	ts, err := h.tk.CreateToken(u.ID)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	saveErr := h.rd.CreateAuth(u.ID, ts)
+	if saveErr != nil {
+		c.JSON(http.StatusUnprocessableEntity, saveErr.Error())
+		return
+	}
+	tokens := map[string]string{
+		"access_token":  ts.AccessToken,
+		"refresh_token": ts.RefreshToken,
+	}
+	m = make(map[string]User)
+	m[u.ID] = u
+	c.JSON(http.StatusOK, tokens)
+}
 
 func (h *profileHandler) Refresh(c *gin.Context) {
 	mapToken := map[string]string{}
@@ -136,7 +191,7 @@ func (h *profileHandler) Refresh(c *gin.Context) {
 			return
 		}
 		userId, roleOk := claims["user_id"].(string)
-		if  roleOk == false {
+		if roleOk == false {
 			c.JSON(http.StatusUnprocessableEntity, "unauthorized")
 			return
 		}
@@ -148,7 +203,7 @@ func (h *profileHandler) Refresh(c *gin.Context) {
 		}
 		//Create new pairs of refresh and access tokens
 		ts, createErr := h.tk.CreateToken(userId)
-		if  createErr != nil {
+		if createErr != nil {
 			c.JSON(http.StatusForbidden, createErr.Error())
 			return
 		}
@@ -167,16 +222,3 @@ func (h *profileHandler) Refresh(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, "refresh expired")
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
