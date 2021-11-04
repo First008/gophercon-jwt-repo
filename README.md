@@ -16,8 +16,8 @@ First things first this project is a clone of [this](https://github.com/victorst
  - ```
     {
         "id": <"your id. example: Social security number">,
-        "username": <"Your username"><br/>
-        "password": <"Your password"><br/>
+        "username": <"Your username">
+        "password": <"Your password">
     }
 
     ```
