@@ -1,6 +1,6 @@
 # gophercon-jwt-repo
 
-First things first this project is a clone of [this]() project. I added some new features (i think?) on it.
+First things first this project is a clone of [this](https://github.com/victorsteven/gophercon-jwt-repo) project. I added some new features (i think?) on it.
 
 ## So what this project is doing?
 
