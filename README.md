@@ -72,7 +72,7 @@ First things first this project is a clone of [this](https://github.com/victorst
 
  # How to build?
 
- 1. ``` go mod init <something> ```
+ 1. ``` go mod init jwt-app ```
 
  2. ``` go mod tidy && go mod vendor ```
 
